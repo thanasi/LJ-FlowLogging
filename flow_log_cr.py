@@ -1,9 +1,9 @@
 #!/usr/local/bin/env python
-############################
-## A G Athanassiadis
-## Dec 2014
-##
-############################
+##############
+# A G Athanassiadis
+# Dec 2014
+#
+##############
 from __future__ import division
 
 import numpy as np
@@ -11,47 +11,60 @@ import u6
 from datetime import datetime
 import sys
 
-## CONSTANTS
+# CONSTANTS
 
-runTime = 10    ## [seconds] time to acquire data for
+runTime = 10    # [seconds] time to acquire data for
 
-## output file
+# output file
 filepath = "/Users/thanasi/Dropbox (MIT)/data/flow_rates_v1/"
 
 
 if __name__ == "__main__":
 
-    ## get
-    notes = sys.argv[1]
+    # get any notes if there are any
 
+    try:
+        notes = sys.argv[1]
+    except IndexError:
+        notes = None
 
     try:
         # initialize device
         d = u6.U6()
 
-        ## For applying the proper calibration to readings.
+        # For applying the proper calibration to readings.
         d.getCalibrationData()
 
+        sys.stdout.write("Initialized U6...")
 
-        ## set up counter
-        ## Max input frequency = 8 MHz
-        ## if it's the only timer/counter
-        ##  Counter0 will read on FIO0
+        # set up counter
+        # Max input frequency = 8 MHz
+        # if it's the only timer/counter
+        #  Counter0 will read on FIO0
+        # Just read the number of counts
+        # at a fixed sampling rate
         d.configIO(EnableCounter0=True)
+
+        sys.stdout.write("collecting data for %d seconds\n" % runTime)
 
         counts = []
         times = []
 
         start_time = datetime.now()
-        dt = 0  ## seconds
+        dt = 0  # seconds
+
+        # get the first count and reset the counter
+        c = d.getFeedback( u6.Counter0(True) )[0]
+        times.append(dt)
+        counts.append(c)
 
         while dt < runTime:
 
-            ## get number of counts
+            # get number of counts
             c = d.getFeedback( u6.Counter0(False) )[0]
 
-            dt = datetime.now() - start_time    ## datetime object
-            dt = dt.seconds + float(dt.microseconds)/1000000.   ## seconds
+            dt = datetime.now() - start_time    # datetime object
+            dt = dt.seconds + float(dt.microseconds)/1000000.   # seconds
 
             times.append(dt)
             counts.append(c)
@@ -63,23 +76,30 @@ if __name__ == "__main__":
         sys.stdout.flush()
 
 
-        nCounts = np.array(counts)      ## counts
-        nTimes = np.array(times)    ## seconds
+        nCounts = np.array(counts)      # counts
+        nTimes = np.array(times)    # seconds
+
+        # find edges where the counts increased
+        mask = nCounts[1:] > nCounts[:-1]
+
+        # this is the relevant data
+        nCounts1 = nCounts[mask]
+        nTimes1 = nTimes[mask]
 
 
-        ## name the file based on start time and the fact that is the flow data
+        # name the file based on start time and the fact that is the flow data
         filename = start_time.strftime("%Y.%m.%d.%H%M%S.fbundle")
 
 
-        np.savez("%s%s.npz" % (filepath,filename),
-                 counts=nCounts, times=nTimes, notes=notes)
+        # np.savez("%s%s.npz" % (filepath,filename),
+        #          counts=nCounts, times=nTimes, notes=notes)
 
-    ## clean up if we run into issues
-    ## that way there are no problems re-running
+    # clean up if we run into issues
+    # that way there are no problems re-running
     except Exception, e:
-        print "Caught an exception", e
+        print "Caught an exception:", e
         pass
 
 
-    ## finally
+    # finally
     d.close()
