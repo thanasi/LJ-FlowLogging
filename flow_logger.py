@@ -37,54 +37,61 @@ if __name__ == "__main__":
 
         sys.stdout.write("Initialized U6...")
 
-        # set up counter
-        # Max input frequency = 8 MHz
-        # if it's the only timer/counter
-        #  Counter0 will read on FIO0
-        # Just read the number of counts
-        # at a fixed sampling rate
-        d.configIO(EnableCounter0=True)
+        # set up system timer
+        # and a single counter
+        d.configIO(NumberTimersEnabled=1, EnableCounter0=True)
 
-        sys.stdout.write("collecting data for %d seconds\n" % runTime)
+        configCommand = []
+        configCommand.append(u6.Timer0Config(TimerMode = u6.LJ_tmSYSTIMERLOW))      # system timer runs at 4 MHz
+        d.getFeedback(configCommand)
+
+        sys.stdout.write("Configured timers...")
 
         counts = []
         times = []
 
+        command = []
+        command.append(u6.Timer0())
+        command.append(u6.Counter0(False))
+
+
+        sys.stdout.write("collecting data for %d seconds\n" % runTime)
         start_time = datetime.now()
-        dt = 0  # seconds
 
-        # get the first count and reset the counter
-        c = d.getFeedback( u6.Counter0(True) )[0]
-        times.append(dt)
-        counts.append(c)
+        # reset the counter
+        d.getFeedback( u6.Counter0(True) )
 
-        while dt < runTime:
+        # now actually get the first data point
+        r = d.getFeedback( command )
+        times.append(r[0])
+        counts.append(r[1])
 
+        nSamples = 0
+
+        # record data for preset duration
+        while (datetime.now() - start_time).seconds < runTime:
             # get number of counts
-            c = d.getFeedback( u6.Counter0(False) )[0]
+            r = d.getFeedback( command )
+            nSamples += 1
 
-            dt = datetime.now() - start_time    # datetime object
-            dt = dt.seconds + float(dt.microseconds)/1000000.   # seconds
+            # only save if the count has increased
+            if r[1] > counts[-1]:
+                times.append(r[0])
+                counts.append(r[1])
 
-            times.append(dt)
-            counts.append(c)
 
-
-        nSamples = len(counts)
-        sys.stdout.write("%0ss per sample\n" % (dt/nSamples))
-        sys.stdout.write("%4.3f samples/sec\n" % (nSamples/dt))
+        # nSamples = len(counts)
+        sys.stdout.write("%0s per sample\n" % (runTime/nSamples))           ## this gives an x-error bar
+        sys.stdout.write("%4.3f samples/sec\n" % (nSamples/runTime))
         sys.stdout.flush()
 
 
-        nCounts = np.array(counts)      # counts
-        nTimes = np.array(times)    # seconds
+        # make everything numpy-ified
+        nCounts = np.array(counts, dtype = np.int32)    # counts
+        nTimes = np.array(times, dtype = np.float32)    # seconds
 
-        # find edges where the counts increased
-        mask = nCounts[1:] > nCounts[:-1]
-
-        # this is the relevant data
-        nCounts1 = nCounts[mask]
-        nTimes1 = nTimes[mask]
+        nTimes -= nTimes[0]
+        nTimes /= 4e6           # convert from 4MHz clock cycles to seconds
 
 
         # name the file based on start time and the fact that is the flow data
