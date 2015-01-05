@@ -37,9 +37,9 @@ if __name__ == "__main__":
 
         sys.stdout.write("Initialized U6...")
 
-        # set up system timer
-        # and a single counter
-        d.configIO(NumberTimersEnabled=1, EnableCounter0=True)
+        # set up system timer (will take up FIO0 line)
+        # and a single counter (FIO1) (Counter0 is disabled)
+        d.configIO(NumberTimersEnabled=1, EnableCounter1=True)
 
         configCommand = []
         configCommand.append(u6.Timer0Config(TimerMode = u6.LJ_tmSYSTIMERLOW))      # system timer runs at 4 MHz
@@ -51,15 +51,15 @@ if __name__ == "__main__":
         times = []
 
         command = []
-        command.append(u6.Timer0())
-        command.append(u6.Counter0(False))
+        command.append(u6.Timer0())         # results[0]
+        command.append(u6.Counter1(False))  # results[1]
 
 
         sys.stdout.write("collecting data for %d seconds\n" % runTime)
         start_time = datetime.now()
 
         # reset the counter
-        d.getFeedback( u6.Counter0(True) )
+        d.getFeedback( u6.Counter1(True) )
 
         # now actually get the first data point
         r = d.getFeedback( command )
